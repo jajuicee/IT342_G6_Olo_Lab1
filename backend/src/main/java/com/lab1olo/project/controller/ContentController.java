@@ -1,34 +1,49 @@
 package com.lab1olo.project.controller;
 
-import com.lab1olo.project.repository.ContentRepository;
+
 import com.lab1olo.project.model.Content;
+import com.lab1olo.project.repository.ContentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
+
+
 
 @RestController
 @RequestMapping("/api/content")
-@CrossOrigin(origins = "*") // Allows your React frontend to connect
+@CrossOrigin(origins = "*")
 public class ContentController {
 
     @Autowired
     private ContentRepository contentRepository;
 
-    // 1. Get all content (For your Home/Gallery page)
+    // Fetch all content for the main feed
     @GetMapping("/all")
     public List<Content> getAllContent() {
         return contentRepository.findAll();
     }
 
-    // 2. Add new content (For your Upload page)
+    // Add new content (linked to a user and category)
     @PostMapping("/add")
-    public Content addContent(@RequestBody Content content) {
-        return contentRepository.save(content);
+    public ResponseEntity<Content> addContent(@RequestBody Content content) {
+        Content savedContent = contentRepository.save(content);
+        return ResponseEntity.ok(savedContent);
     }
 
-    // 3. Get content by ID (For a specific detail page)
+    // Get specific content by ID
     @GetMapping("/{id}")
-    public Content getContentById(@PathVariable int id) {
-        return contentRepository.findById(id).orElse(null);
+    public ResponseEntity<Content> getContentById(@PathVariable int id) {
+        return contentRepository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    // Delete content
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<?> deleteContent(@PathVariable int id) {
+        contentRepository.deleteById(id);
+        return ResponseEntity.ok("Content deleted successfully");
     }
 }
