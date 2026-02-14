@@ -3,6 +3,7 @@ package com.lab1olo.project.controller;
 import com.lab1olo.project.model.User;
 import com.lab1olo.project.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -12,7 +13,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*") // Allows React (port 3000) to talk to Spring (port 8080)
+@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class AuthController {
 
     @Autowired
@@ -26,28 +27,41 @@ public class AuthController {
         if (userRepository.findByEmail(user.getEmail()).isPresent()) {
             return ResponseEntity.badRequest().body("Error: Email is already in use!");
         }
-        // Encrypt the password before saving to MySQL
+
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-        user.setRole("USER"); // Default role as per your ER diagram
+
+        if (user.getRole() == null) {
+            user.setRole("USER");
+        }
+
         userRepository.save(user);
         return ResponseEntity.ok("User registered successfully!");
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> loginUser(@RequestBody User loginRequest) {
-        Optional<User> user = userRepository.findByEmail(loginRequest.getEmail());
+        // Find user by email provided in the login body
+        Optional<User> userOptional = userRepository.findByEmail(loginRequest.getEmail());
 
-        if (user.isPresent() && passwordEncoder.matches(loginRequest.getPassword(), user.get().getPassword())) {
-            // In a real app, you'd return a Token/Session here
-            return ResponseEntity.ok(user.get());
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+            // Compare plain text password from request with hashed password in DB
+            if (passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
+
+                // SECURITY: Remove password hash before sending user object back to React
+                user.setPassword(null);
+
+                return ResponseEntity.ok(user);
+            }
         }
-        return ResponseEntity.status(401).body("Invalid email or password");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid email or password");
     }
+
+    @GetMapping("/me")
     public ResponseEntity<?> getCurrentUser(Principal principal) {
         if (principal == null) {
-            return ResponseEntity.status(401).body("Not authenticated");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Not authenticated");
         }
-        // principal.getName() usually returns the email/username
         return ResponseEntity.ok(userRepository.findByEmail(principal.getName()));
     }
 }
